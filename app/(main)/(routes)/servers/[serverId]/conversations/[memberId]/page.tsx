@@ -1,4 +1,5 @@
 import { ChatHeader } from "@/components/chat/chat-header";
+import { getOrCreateConversation } from "@/lib/conversation";
 import { currentProfile } from "@/lib/current-profile";
 import { db } from "@/lib/db";
 import { redirectToSignIn } from "@clerk/nextjs";
@@ -19,9 +20,9 @@ const MemberIdPage = async ({ params }: MemberIdPageProps) => {
     return redirectToSignIn();
   }
 
-  const member = await db.member.findFirst({
+  const currentMember = await db.member.findFirst({
     where: {
-      id: params.memberId,
+      profileId: profile.id,
       serverId: params.serverId,
     },
     include: {
@@ -29,17 +30,31 @@ const MemberIdPage = async ({ params }: MemberIdPageProps) => {
     },
   });
 
-  if (!member) {
+  if (!currentMember) {
     return redirect("/");
   }
 
+  const conversation = await getOrCreateConversation(
+    currentMember.id,
+    params.memberId
+  );
+
+  if (!conversation) {
+    return redirect(`/servers/${params.serverId}`);
+  }
+
+  const { memberOne, memberTwo } = conversation;
+
+  const otherMember =
+    memberOne.profileId === profile.id ? memberTwo : memberOne;
+
   return (
-    <div>
+    <div className="bg-white dark:bg-[#313338] flex flex-col h-full">
       <ChatHeader
-        name={member.profile.name}
+        imageUrl={otherMember.profile.imageUrl}
+        name={otherMember.profile.name}
         serverId={params.serverId}
         type="conversation"
-        imageUrl={member.profile.imageUrl}
       />
     </div>
   );
